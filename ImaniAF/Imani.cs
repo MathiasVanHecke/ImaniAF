@@ -95,6 +95,86 @@ namespace ImaniAF
         }
         #endregion
 
+        #region GetUser
+        [FunctionName("GetUser")]
+        public static HttpResponseMessage GetUser([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "getuser/{UserID}")]HttpRequestMessage req, String UserID, TraceWriter log)
+        {
+            try
+            {
+                RegisterUser user = new RegisterUser();
+                using (SqlConnection connection = new SqlConnection(CONNECTIONSTRING))
+                {
+                    connection.Open();
+                    using (SqlCommand command = new SqlCommand())
+                    {
+                        command.Connection = connection;
+                        string sql = "SELECT * FROM [user] WHERE userID = @userID";
+                        command.Parameters.AddWithValue("@userID", UserID);
+                        command.CommandText = sql;
+                        SqlDataReader reader = command.ExecuteReader();
+                        while (reader.Read())
+                        {
+                            user.UserId = new Guid(reader["userID"].ToString());
+                            user.Name = reader["name"].ToString();
+                            user.Email = reader["email"].ToString();
+                            user.Password = reader["password"].ToString();
+                            user.Sharekey = reader["sharekey"].ToString();
+                        }
+                    }
+                }
+                //var json = JsonConvert.SerializeObject(garbageTypes);
+                return req.CreateResponse(HttpStatusCode.OK, user);
+
+            }
+            catch (Exception ex)
+            {
+                return req.CreateResponse(HttpStatusCode.InternalServerError, ex);
+
+            }
+        }
+
+        #endregion
+
+        #region LoginUser
+        [FunctionName("LoginUser")]
+        public static HttpResponseMessage LoginUser([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "loginuser/{email}/{hashpsw}")]HttpRequestMessage req, String email, String hashpsw, TraceWriter log)
+        {
+            try
+            {
+                RegisterUser user = new RegisterUser();
+                using (SqlConnection connection = new SqlConnection(CONNECTIONSTRING))
+                {
+                    connection.Open();
+                    using (SqlCommand command = new SqlCommand())
+                    {
+                        command.Connection = connection;
+                        string sql = "SELECT * FROM [user] WHERE email = @email and password = @password";
+                        command.Parameters.AddWithValue("@email", email);
+                        command.Parameters.AddWithValue("@password", hashpsw);
+                        command.CommandText = sql;
+                        SqlDataReader reader = command.ExecuteReader();
+                        while (reader.Read())
+                        {
+                            user.UserId = new Guid(reader["userID"].ToString());
+                            user.Name = reader["name"].ToString();
+                            user.Email = reader["email"].ToString();
+                            user.Password = reader["password"].ToString();
+                            user.Sharekey = reader["sharekey"].ToString();
+                        }
+                    }
+                }
+                //var json = JsonConvert.SerializeObject(garbageTypes);
+                return req.CreateResponse(HttpStatusCode.OK, user);
+
+            }
+            catch (Exception ex)
+            {
+                return req.CreateResponse(HttpStatusCode.InternalServerError, ex);
+
+            }
+        }
+        #endregion
+
         #region Functions
         public static string GenerateSharkey()
         {
