@@ -50,10 +50,9 @@ namespace ImaniAF
                 using (SqlCommand command = new SqlCommand())
                 {
                     command.Connection = connection;
-                    string GuidId = Guid.NewGuid().ToString();
                     string sql = "INSERT INTO [user] VALUES(@userID, @name, @email, @password,@sharekey)";
                     command.CommandText = sql;
-                    command.Parameters.AddWithValue("@userID", GuidId);
+                    command.Parameters.AddWithValue("@userID", user.UserId.ToString());
                     command.Parameters.AddWithValue("@name", user.Name);
                     command.Parameters.AddWithValue("@email", user.Email);
                     command.Parameters.AddWithValue("@password", user.Password);
