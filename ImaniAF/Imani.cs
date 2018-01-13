@@ -5,10 +5,13 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Text;
+using System.Threading.Tasks;
 using ImaniAF.Model;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Host;
+using Microsoft.WindowsAzure.Storage;
+using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
 
 namespace ImaniAF
@@ -172,6 +175,42 @@ namespace ImaniAF
                 return req.CreateResponse(HttpStatusCode.InternalServerError, ex);
 
             }
+        }
+        #endregion
+
+        #region AddProfilePicture
+        //ps: vergeet de links niet te zetten in azure functions
+        [FunctionName("AddProfilePicture")]
+        public async static Task<HttpResponseMessage> AddProfilePicture([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "pictures/send/{containerName}/{fileName}")]HttpRequestMessage req, string containerName, string fileName, TraceWriter log)
+        {
+            //!!!! TODO !!!! Add two parameters called containerName and fileName to the function header
+
+            //read data stream from request
+            var stream = await req.Content.ReadAsStreamAsync();
+
+            //get access to Azure blob storage account
+            CloudStorageAccount storageAccount = CloudStorageAccount.Parse(String.Format("DefaultEndpointsProtocol=https;AccountName={0};AccountKey={1}", Environment.GetEnvironmentVariable("BlobAccount"), Environment.GetEnvironmentVariable("BlobAccountKey")));
+
+            //create a client on this account
+            CloudBlobClient blobClient = storageAccount.CreateCloudBlobClient();
+
+            //check if the container already exists; if not, create it
+            CloudBlobContainer container = blobClient.GetContainerReference(containerName);
+            container.CreateIfNotExists();
+
+            //set correct permissions for blob object
+            BlobContainerPermissions permissions = container.GetPermissions();
+            permissions.PublicAccess = BlobContainerPublicAccessType.Container;
+            container.SetPermissions(permissions);
+
+            //upload the actual image using the filename that was provided
+            CloudBlockBlob blockBlob = container.GetBlockBlobReference(fileName);
+            blockBlob.UploadFromStream(stream);
+
+            //send the created url as a response
+            return req.CreateResponse(HttpStatusCode.OK, blockBlob.StorageUri.PrimaryUri);
+
+
         }
         #endregion
 
