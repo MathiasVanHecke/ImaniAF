@@ -192,6 +192,36 @@ namespace ImaniAF
 
         #endregion
 
+        #region Delete follower
+        [FunctionName("DeleteFollower")]
+        public static HttpResponseMessage DeleteFollower([HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "delete/{userid}/{delete_follower}")]HttpRequestMessage req, String userid, String delete_follower, TraceWriter log)
+        {
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(CONNECTIONSTRING))
+                {
+                    connection.Open();
+                    using (SqlCommand command = new SqlCommand())
+                    {
+                        command.Connection = connection;
+                        string sql = "DELETE FROM [follow_users] WHERE follow_userID = @follow_userID AND userID = @delete_follower";
+                        command.Parameters.AddWithValue("@follow_userID", userid);
+                        command.Parameters.AddWithValue("@delete_follower", delete_follower);
+                        command.CommandText = sql;
+                        command.ExecuteNonQuery();
+                    }
+                }
+                //var json = JsonConvert.SerializeObject(garbageTypes);
+                return req.CreateResponse(HttpStatusCode.OK);
+            }
+            catch (Exception ex)
+            {
+                return req.CreateResponse(HttpStatusCode.InternalServerError, ex);
+
+            }
+        }
+        #endregion
+
         #region GetUser
         [FunctionName("GetUser")]
         public static HttpResponseMessage GetUser([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "getuser/{UserID}")]HttpRequestMessage req, String UserID, TraceWriter log)
@@ -230,7 +260,7 @@ namespace ImaniAF
 
         #endregion
 
-        #region LoginUser
+        #region Login User
         [FunctionName("LoginUser")]
         public static HttpResponseMessage LoginUser([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "loginuser/{email}/{hashpsw}")]HttpRequestMessage req, String email, String hashpsw, TraceWriter log)
         {
