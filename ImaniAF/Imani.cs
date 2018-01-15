@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Data.SqlClient;
 using System.Diagnostics;
 using System.Linq;
@@ -18,11 +19,8 @@ namespace ImaniAF
 {
     public static class Imani
     {
-        //sql
+        //SQL
         private static string CONNECTIONSTRING = Environment.GetEnvironmentVariable("ConnectionString");
-
-        //help
-
 
         #region leeg
         [FunctionName("Imani")]
@@ -65,6 +63,66 @@ namespace ImaniAF
         }
         #endregion
 
+        #region Add follower
+        [FunctionName("AddFollower")]
+        public static HttpResponseMessage AddFollower([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "addfollower/{base_userid}/{sharekey}")]HttpRequestMessage req, String base_userID, String sharekey, TraceWriter log)
+        {
+            RegisterUser user = new RegisterUser();
+            try
+            {
+                //Zoek de gebruiker waar de sharekey over een komt
+
+                using (SqlConnection connection = new SqlConnection(CONNECTIONSTRING))
+                {
+                    connection.Open();
+                    using (SqlCommand command = new SqlCommand())
+                    {
+                        command.Connection = connection;
+                        string sql = "SELECT * FROM [user] WHERE sharekey = @sharekey";
+                        command.Parameters.AddWithValue("@sharekey", sharekey);
+                        command.CommandText = sql;
+                        SqlDataReader reader = command.ExecuteReader();
+                        while (reader.Read())
+                        {
+                            user.UserId = new Guid(reader["userID"].ToString());
+                            user.Name = reader["name"].ToString();
+                            user.Email = reader["email"].ToString();
+                            user.Password = reader["password"].ToString();
+                            user.Sharekey = reader["sharekey"].ToString();
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return req.CreateResponse(HttpStatusCode.InternalServerError, ex);
+            }
+            //Follower toevoegen aan de vorige user.UserID
+
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(CONNECTIONSTRING))
+                {
+                    connection.Open();
+                    using (SqlCommand command = new SqlCommand())
+                    {
+                        command.Connection = connection;
+                        string sql = "INSERT INTO [follow_users] VALUES(@userID, @follow_userID)";
+                        command.CommandText = sql;
+                        command.Parameters.AddWithValue("@userID", user.UserId.ToString());
+                        command.Parameters.AddWithValue("@follow_userID", base_userID);
+                        command.ExecuteNonQuery();
+                        return req.CreateResponse(HttpStatusCode.OK, user);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                 return req.CreateResponse(HttpStatusCode.InternalServerError, ex);
+            }
+        }
+        #endregion
+
         #region Add Track
         [FunctionName("AddTrack")]
         public static async System.Threading.Tasks.Task<HttpResponseMessage> AddTrack([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "addtrack")]HttpRequestMessage req, TraceWriter log)
@@ -97,6 +155,43 @@ namespace ImaniAF
         }
         #endregion
 
+        #region Get Followers
+        [FunctionName("GetFollowers")]
+        public static HttpResponseMessage GetFollowers([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "getfollowers/{UserID}")]HttpRequestMessage req, String UserID, TraceWriter log)
+        {
+            try
+            {
+                List<RegisterUser> followers = new List<RegisterUser>();
+                using (SqlConnection connection = new SqlConnection(CONNECTIONSTRING))
+                {
+                    connection.Open();
+                    using (SqlCommand command = new SqlCommand())
+                    {
+                        command.Connection = connection;
+                        string sql = "SELECT * FROM [follow_users] WHERE follow_userID = @follow_userID";
+                        command.Parameters.AddWithValue("@follow_userID", UserID);
+                        command.CommandText = sql;
+                        SqlDataReader reader = command.ExecuteReader();
+                        while (reader.Read())
+                        {
+                            RegisterUser user = new RegisterUser();
+                            user.UserId = new Guid(reader["userID"].ToString());
+                            followers.Add(user);
+                        }
+                    }
+                }
+                //var json = JsonConvert.SerializeObject(garbageTypes);
+                return req.CreateResponse(HttpStatusCode.OK, followers);
+            }
+            catch (Exception ex)
+            {
+                return req.CreateResponse(HttpStatusCode.InternalServerError, ex);
+
+            }
+        }
+
+        #endregion
+
         #region GetUser
         [FunctionName("GetUser")]
         public static HttpResponseMessage GetUser([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "getuser/{UserID}")]HttpRequestMessage req, String UserID, TraceWriter log)
@@ -124,14 +219,12 @@ namespace ImaniAF
                         }
                     }
                 }
-                //var json = JsonConvert.SerializeObject(garbageTypes);
                 return req.CreateResponse(HttpStatusCode.OK, user);
 
             }
             catch (Exception ex)
             {
                 return req.CreateResponse(HttpStatusCode.InternalServerError, ex);
-
             }
         }
 
