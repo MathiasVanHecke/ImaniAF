@@ -168,7 +168,7 @@ namespace ImaniAF
                     using (SqlCommand command = new SqlCommand())
                     {
                         command.Connection = connection;
-                        string sql = "SELECT * FROM [follow_users] WHERE follow_userID = @follow_userID";
+                        string sql = "SELECT * FROM [dbo].[follow_users] INNER JOIN [dbo].[user] ON [dbo].[follow_users].userID = [dbo].[user].userID WHERE follow_userID = @follow_userID";
                         command.Parameters.AddWithValue("@follow_userID", UserID);
                         command.CommandText = sql;
                         SqlDataReader reader = command.ExecuteReader();
@@ -176,6 +176,10 @@ namespace ImaniAF
                         {
                             RegisterUser user = new RegisterUser();
                             user.UserId = new Guid(reader["userID"].ToString());
+                            user.Name = reader["name"].ToString();
+                            user.Email = reader["email"].ToString();
+                            user.Password = reader["password"].ToString();
+                            user.Sharekey = reader["sharekey"].ToString();
                             followers.Add(user);
                         }
                     }
