@@ -155,6 +155,36 @@ namespace ImaniAF
         }
         #endregion
 
+        #region Add Bug
+        [FunctionName("AddBug")]
+        public static async System.Threading.Tasks.Task<HttpResponseMessage> AddBug([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "addbug")]HttpRequestMessage req, TraceWriter log)
+        {
+            //Inlezen van externe json
+            var content = await req.Content.ReadAsStringAsync();
+            var bug = JsonConvert.DeserializeObject<Bug>(content);
+
+            //Schrijven naar database
+            using (SqlConnection connection = new SqlConnection(CONNECTIONSTRING))
+            {
+                connection.Open();
+                using (SqlCommand command = new SqlCommand())
+                {
+                    command.Connection = connection;
+                    string sql = "INSERT INTO bug VALUES(@userID,@time,@bugText)";
+
+                    command.CommandText = sql;
+                    command.Parameters.AddWithValue("@userID", bug.UserId);
+                    command.Parameters.AddWithValue("@time", bug.Date);
+                    command.Parameters.AddWithValue("@bugText",bug.BugText);
+
+                    command.ExecuteNonQuery();
+
+                    return req.CreateResponse(HttpStatusCode.OK, bug);
+                }
+            }
+        }
+        #endregion
+
         #region Get Followers
         [FunctionName("GetFollowers")]
         public static HttpResponseMessage GetFollowers([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "getfollowers/{UserID}")]HttpRequestMessage req, String UserID, TraceWriter log)
