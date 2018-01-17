@@ -40,30 +40,65 @@ namespace ImaniAF
         {
             //Inlezen van externe json
             var content = await req.Content.ReadAsStringAsync();
-            var user = JsonConvert.DeserializeObject<RegisterUser>(content);
+            var user_try = JsonConvert.DeserializeObject<RegisterUser>(content);
+            var user_fail = new RegisterUser();
 
-            //Schrijven naar database
-            using (SqlConnection connection = new SqlConnection(CONNECTIONSTRING))
+            try
             {
-                connection.Open();
-                using (SqlCommand command = new SqlCommand())
-                {
-                    command.Connection = connection;
-                    string sql = "INSERT INTO [user] VALUES(@userID,@created, @name, @email, @password,@sharekey)";
-                    command.CommandText = sql;
-                    String salt = CreateSalt(8);
-                    String hash = GenerateSaltedHash(user.Password.ToString(), salt);
-                    command.Parameters.AddWithValue("@userID", user.UserId.ToString());
-                    command.Parameters.AddWithValue("@created", DateTime.Now);
-                    command.Parameters.AddWithValue("@name", user.Name);
-                    command.Parameters.AddWithValue("@email", user.Email);
-                    command.Parameters.AddWithValue("@password", salt + ":" + hash);
-                    command.Parameters.AddWithValue("@sharekey", GenerateSharkey());
-                    command.ExecuteNonQuery();
 
-                    return req.CreateResponse(HttpStatusCode.OK, user);
+
+                using (SqlConnection connection = new SqlConnection(CONNECTIONSTRING))
+                {
+                    connection.Open();
+                    using (SqlCommand command = new SqlCommand())
+                    {
+                        command.Connection = connection;
+                        string sql = "SELECT email FROM [user] WHERE email = @email";
+                        command.Parameters.AddWithValue("@email", user_try.Email.ToString());
+                        command.CommandText = sql;
+                        SqlDataReader reader = command.ExecuteReader();
+                        while (reader.Read())
+                        {
+                            user_try.Email = reader["email"].ToString();
+                        }
+                        if (reader.HasRows == true)
+                        {
+                            //Gebruiker bestaat al
+                            return req.CreateResponse(HttpStatusCode.OK, user_fail);
+                        }
+                        else
+                        {
+                            //Gebruiker toevoegen
+                            using (SqlConnection connection2 = new SqlConnection(CONNECTIONSTRING))
+                            {
+                              
+                                using (SqlCommand command2 = new SqlCommand())
+                                {
+                                    string sql2 = "INSERT INTO [user] VALUES(@userID,@created, @name, @email, @password,@sharekey)";
+                                    command.CommandText = sql2;
+                                    String salt = CreateSalt(8);
+                                    String hash = GenerateSaltedHash(user_try.Password.ToString(), salt);
+                                    command.Parameters.AddWithValue("@userID", user_try.UserId.ToString());
+                                    command.Parameters.AddWithValue("@created", DateTime.Now);
+                                    command.Parameters.AddWithValue("@name", user_try.Name);
+                                    command.Parameters.AddWithValue("@email", user_try.Email);
+                                    command.Parameters.AddWithValue("@password", salt + ":" + hash);
+                                    command.Parameters.AddWithValue("@sharekey", GenerateSharkey());
+                                    command.ExecuteNonQuery();
+
+                                    return req.CreateResponse(HttpStatusCode.OK, user_try);
+                                }
+                            }
+
+                        }
+                    }
                 }
             }
+            catch (Exception ex)
+            {
+                return req.CreateResponse(HttpStatusCode.InternalServerError, ex);
+            }
+
         }
         #endregion
 
@@ -354,10 +389,15 @@ namespace ImaniAF
                         {
                             user_database.Password = reader["password"].ToString();
                         }
+                        if(reader.HasRows == false)
+                        {
+                            Debug.WriteLine("Acces denied");
+                            return req.CreateResponse(HttpStatusCode.OK, user_database);
+                        }
 
                         String[] delen = user_database.Password.ToString().Split(':');
                         String database_salt = delen[0].ToString();
-                        //kijk eens als de key bij het aanmaken gelijk is aan deze key
+                    
                         String database_hash = delen[1].ToString();
 
                         String hash_try = GenerateSaltedHash(user_try.Password.ToString(), database_salt);
@@ -401,13 +441,12 @@ namespace ImaniAF
                             catch (Exception ex)
                             {
                                 return req.CreateResponse(HttpStatusCode.InternalServerError, ex);
-
                             }
                         }
                         else
                         {
                             Debug.WriteLine("Acces denied");
-                            return req.CreateResponse(HttpStatusCode.OK, acces);
+                            return req.CreateResponse(HttpStatusCode.OK, user_try);
                         }
                     }
                 }
@@ -416,8 +455,6 @@ namespace ImaniAF
             {
                 return req.CreateResponse(HttpStatusCode.InternalServerError, ex);
             }
-        
-
         }
         #endregion
 
