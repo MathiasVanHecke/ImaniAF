@@ -11,6 +11,8 @@ namespace ImaniAF.Model
     {
         [JsonProperty("userid")]
         public Guid UserId { get; set; }
+        [JsonProperty("created")]
+        public DateTime Created { get; set; }
         [JsonProperty("name")]
         public String Name { get; set; }
         [JsonProperty("email")]

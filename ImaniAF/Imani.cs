@@ -7,6 +7,7 @@ using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using System.Security.Cryptography;
 using ImaniAF.Model;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
@@ -48,12 +49,15 @@ namespace ImaniAF
                 using (SqlCommand command = new SqlCommand())
                 {
                     command.Connection = connection;
-                    string sql = "INSERT INTO [user] VALUES(@userID, @name, @email, @password,@sharekey)";
+                    string sql = "INSERT INTO [user] VALUES(@userID,@created, @name, @email, @password,@sharekey)";
                     command.CommandText = sql;
+                    String salt = CreateSalt(8);
+                    String hash = GenerateSaltedHash(user.Password.ToString(), salt);
                     command.Parameters.AddWithValue("@userID", user.UserId.ToString());
+                    command.Parameters.AddWithValue("@created", DateTime.Now);
                     command.Parameters.AddWithValue("@name", user.Name);
                     command.Parameters.AddWithValue("@email", user.Email);
-                    command.Parameters.AddWithValue("@password", user.Password);
+                    command.Parameters.AddWithValue("@password", salt + ":" + hash);
                     command.Parameters.AddWithValue("@sharekey", GenerateSharkey());
                     command.ExecuteNonQuery();
 
@@ -97,8 +101,7 @@ namespace ImaniAF
             {
                 return req.CreateResponse(HttpStatusCode.InternalServerError, ex);
             }
-            //Follower toevoegen aan de vorige user.UserID
-
+            //Follower toevoegen aan de vorige user.
             try
             {
                 using (SqlConnection connection = new SqlConnection(CONNECTIONSTRING))
@@ -256,6 +259,35 @@ namespace ImaniAF
         }
         #endregion
 
+        #region Delete user
+        [FunctionName("DeleteUser")]
+        public static HttpResponseMessage DeleteUser([HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "delete/{userid}")]HttpRequestMessage req, String userid, TraceWriter log)
+        {
+            //Nog niet af tracking history moet men ook kunnen verwijderen
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(CONNECTIONSTRING))
+                {
+                    connection.Open();
+                    using (SqlCommand command = new SqlCommand())
+                    {
+                        command.Connection = connection;
+                        string sql = "DELETE FROM [dbo].[follow_users] WHERE [dbo].[follow_users].follow_userID = @userID DELETE FROM[dbo].[user] WHERE[dbo].[user].userID = @userID";
+                        command.Parameters.AddWithValue("@userID", userid);
+                        command.CommandText = sql;
+                        command.ExecuteNonQuery();
+                    }
+                }
+                //var json = JsonConvert.SerializeObject(garbageTypes);
+                return req.CreateResponse(HttpStatusCode.OK);
+            }
+            catch (Exception ex)
+            {
+                return req.CreateResponse(HttpStatusCode.InternalServerError, ex);
+            }
+        }
+        #endregion
+
         #region GetUser
         [FunctionName("GetUser")]
         public static HttpResponseMessage GetUser([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "getuser/{UserID}")]HttpRequestMessage req, String UserID, TraceWriter log)
@@ -296,41 +328,96 @@ namespace ImaniAF
 
         #region Login User
         [FunctionName("LoginUser")]
-        public static HttpResponseMessage LoginUser([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "loginuser/{email}/{hashpsw}")]HttpRequestMessage req, String email, String hashpsw, TraceWriter log)
+        public static async Task<HttpResponseMessage> LoginUserAsync([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "loginuser")]HttpRequestMessage req,TraceWriter log)
         {
+            //Inlezen van externe json
+           
+            var content = await req.Content.ReadAsStringAsync();
+            RegisterUser user_try = JsonConvert.DeserializeObject<RegisterUser>(content);
+            RegisterUser user_database = new RegisterUser();
+
             try
             {
-                RegisterUser user = new RegisterUser();
+
+             
                 using (SqlConnection connection = new SqlConnection(CONNECTIONSTRING))
                 {
                     connection.Open();
                     using (SqlCommand command = new SqlCommand())
                     {
                         command.Connection = connection;
-                        string sql = "SELECT * FROM [user] WHERE email = @email and password = @password";
-                        command.Parameters.AddWithValue("@email", email);
-                        command.Parameters.AddWithValue("@password", hashpsw);
+                        string sql = "SELECT email, password FROM [user] WHERE email = @email";
+                        command.Parameters.AddWithValue("@email", user_try.Email.ToString());
                         command.CommandText = sql;
                         SqlDataReader reader = command.ExecuteReader();
                         while (reader.Read())
                         {
-                            user.UserId = new Guid(reader["userID"].ToString());
-                            user.Name = reader["name"].ToString();
-                            user.Email = reader["email"].ToString();
-                            user.Password = reader["password"].ToString();
-                            user.Sharekey = reader["sharekey"].ToString();
+                            user_database.Password = reader["password"].ToString();
+                        }
+
+                        String[] delen = user_database.Password.ToString().Split(':');
+                        String database_salt = delen[0].ToString();
+                        //kijk eens als de key bij het aanmaken gelijk is aan deze key
+                        String database_hash = delen[1].ToString();
+
+                        String hash_try = GenerateSaltedHash(user_try.Password.ToString(), database_salt);
+
+                        bool acces = CompareByteArrays(Encoding.UTF8.GetBytes(database_hash), Encoding.UTF8.GetBytes(hash_try));
+
+                        byte[] dbhash = Encoding.UTF8.GetBytes(database_hash);
+                        byte[] dbhashsalt = Encoding.UTF8.GetBytes(database_salt);
+                        Debug.WriteLine(database_hash);
+                        Debug.WriteLine(hash_try);
+                        connection.Close();
+
+                        if (acces == true)
+                        {
+                            Debug.WriteLine("Acces granted");
+                            try
+                            {
+                                RegisterUser user = new RegisterUser();
+                                using (SqlConnection connection2 = new SqlConnection(CONNECTIONSTRING))
+                                {
+                                    connection.Open();
+                                    using (SqlCommand command2 = new SqlCommand())
+                                    {
+                                        command.Connection = connection;
+                                        string sql2 = "SELECT * FROM [user] WHERE email = @email2";
+                                        command.Parameters.AddWithValue("@email2", user_try.Email);
+                                        command.CommandText = sql2;
+                                        SqlDataReader reader2 = command.ExecuteReader();
+                                        while (reader2.Read())
+                                        {
+                                            user.UserId = new Guid(reader2["userID"].ToString());
+                                            user.Name = reader2["name"].ToString();
+                                            user.Email = reader2["email"].ToString();
+                                            user.Sharekey = reader2["sharekey"].ToString();
+                                        }
+                                    }
+                                }
+                                return req.CreateResponse(HttpStatusCode.OK, user);
+
+                            }
+                            catch (Exception ex)
+                            {
+                                return req.CreateResponse(HttpStatusCode.InternalServerError, ex);
+
+                            }
+                        }
+                        else
+                        {
+                            Debug.WriteLine("Acces denied");
+                            return req.CreateResponse(HttpStatusCode.OK, acces);
                         }
                     }
                 }
-                //var json = JsonConvert.SerializeObject(garbageTypes);
-                return req.CreateResponse(HttpStatusCode.OK, user);
-
             }
             catch (Exception ex)
             {
                 return req.CreateResponse(HttpStatusCode.InternalServerError, ex);
-
             }
+        
+
         }
         #endregion
 
@@ -386,6 +473,55 @@ namespace ImaniAF
             Debug.WriteLine(builder.ToString());
 
             return builder.ToString();
+        }
+
+        private static string CreateSalt(int size)
+        {
+            //Generate a cryptographic random number.
+            RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider();
+            byte[] buff = new byte[size];
+            rng.GetBytes(buff);
+
+            // Return a Base64 string representation of the random number.
+            return Convert.ToBase64String(buff);
+        }
+
+        static String GenerateSaltedHash(String plainPassword, String salt)
+        {
+            SHA256Managed sha256hashstring = new SHA256Managed();
+
+            byte[] bytes = System.Text.Encoding.UTF8.GetBytes(plainPassword + salt);
+
+            byte[] hash = sha256hashstring.ComputeHash(bytes);
+
+            return ByteArrayToHexString(hash);
+            
+        }
+
+        public static bool CompareByteArrays(byte[] array1, byte[] array2)
+        {
+            if (array1.Length != array2.Length)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < array1.Length; i++)
+            {
+                if (array1[i] != array2[i])
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        public static string ByteArrayToHexString(byte[] ba)
+        {
+            StringBuilder hex = new StringBuilder(ba.Length * 2);
+            foreach (byte b in ba)
+                hex.AppendFormat("{0:x2}", b);
+            return hex.ToString();
         }
         #endregion
     }
