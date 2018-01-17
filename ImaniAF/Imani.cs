@@ -71,20 +71,22 @@ namespace ImaniAF
                             //Gebruiker toevoegen
                             using (SqlConnection connection2 = new SqlConnection(CONNECTIONSTRING))
                             {
-                              
+                                connection2.Open();
                                 using (SqlCommand command2 = new SqlCommand())
                                 {
                                     string sql2 = "INSERT INTO [user] VALUES(@userID,@created, @name, @email, @password,@sharekey)";
-                                    command.CommandText = sql2;
+                                    command2.CommandText = sql2;
+                                    command2.Connection = connection2;
                                     String salt = CreateSalt(8);
                                     String hash = GenerateSaltedHash(user_try.Password.ToString(), salt);
-                                    command.Parameters.AddWithValue("@userID", user_try.UserId.ToString());
-                                    command.Parameters.AddWithValue("@created", DateTime.Now);
-                                    command.Parameters.AddWithValue("@name", user_try.Name);
-                                    command.Parameters.AddWithValue("@email", user_try.Email);
-                                    command.Parameters.AddWithValue("@password", salt + ":" + hash);
-                                    command.Parameters.AddWithValue("@sharekey", GenerateSharkey());
-                                    command.ExecuteNonQuery();
+                                    command2.Parameters.AddWithValue("@userID", user_try.UserId.ToString());
+                                    command2.Parameters.AddWithValue("@created", DateTime.Now);
+                                    command2.Parameters.AddWithValue("@name", user_try.Name);
+                                    command2.Parameters.AddWithValue("@email", user_try.Email);
+                                    command2.Parameters.AddWithValue("@password", salt + ":" + hash);
+                                    command2.Parameters.AddWithValue("@sharekey", GenerateSharkey());
+                             
+                                    command2.ExecuteNonQuery();
 
                                     return req.CreateResponse(HttpStatusCode.OK, user_try);
                                 }
@@ -98,7 +100,6 @@ namespace ImaniAF
             {
                 return req.CreateResponse(HttpStatusCode.InternalServerError, ex);
             }
-
         }
         #endregion
 
@@ -366,11 +367,9 @@ namespace ImaniAF
         public static async Task<HttpResponseMessage> LoginUserAsync([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "loginuser")]HttpRequestMessage req,TraceWriter log)
         {
             //Inlezen van externe json
-           
             var content = await req.Content.ReadAsStringAsync();
             RegisterUser user_try = JsonConvert.DeserializeObject<RegisterUser>(content);
             RegisterUser user_database = new RegisterUser();
-
             try
             {
 
@@ -491,6 +490,43 @@ namespace ImaniAF
             return req.CreateResponse(HttpStatusCode.OK, blockBlob.StorageUri.PrimaryUri);
 
 
+        }
+        #endregion
+
+        #region UpdateUser
+        [FunctionName("UpdateUser")]
+        public static async System.Threading.Tasks.Task<HttpResponseMessage> UpdateUser([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "updateuser")]HttpRequestMessage req, TraceWriter log)
+        {
+            var content = await req.Content.ReadAsStringAsync();
+            var user_update = JsonConvert.DeserializeObject<RegisterUser>(content);
+        
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(CONNECTIONSTRING))
+                {
+                    connection.Open();
+                    using (SqlCommand command = new SqlCommand())
+                    {
+                        command.Connection = connection;
+                        string sql = "UPDATE [user] SET email =  @email, name = @name, password = @password WHERE userID = @userID;";
+                        command.CommandText = sql;
+                        String salt = CreateSalt(8);
+                        String hash = GenerateSaltedHash(user_update.Password.ToString(), salt);
+                        command.Parameters.AddWithValue("@userID", user_update.UserId);
+                        command.Parameters.AddWithValue("@email", user_update.Email);
+                        command.Parameters.AddWithValue("@name", user_update.Name);
+                        command.Parameters.AddWithValue("@password", salt + ":" + hash);
+             
+                   
+                        command.ExecuteNonQuery();
+                        return req.CreateResponse(HttpStatusCode.OK, user_update);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return req.CreateResponse(HttpStatusCode.InternalServerError, ex);
+            }
         }
         #endregion
 
