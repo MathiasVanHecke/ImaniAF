@@ -14,7 +14,7 @@ namespace ImaniAF.Model
         [JsonProperty("time")]
         public DateTime Date { get; set; }
         [JsonProperty("isstanding")]
-        public int isStanding { get; set; }
+        public Boolean isStanding { get; set; }
         [JsonProperty("macdevice")]
         public String MacDevice { get; set; }
     }

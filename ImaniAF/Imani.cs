@@ -42,11 +42,8 @@ namespace ImaniAF
             var content = await req.Content.ReadAsStringAsync();
             var user_try = JsonConvert.DeserializeObject<RegisterUser>(content);
             var user_fail = new RegisterUser();
-
             try
             {
-
-
                 using (SqlConnection connection = new SqlConnection(CONNECTIONSTRING))
                 {
                     connection.Open();
@@ -91,7 +88,6 @@ namespace ImaniAF
                                     return req.CreateResponse(HttpStatusCode.OK, user_try);
                                 }
                             }
-
                         }
                     }
                 }
@@ -194,6 +190,47 @@ namespace ImaniAF
         }
         #endregion
 
+        #region Get Track
+        [FunctionName("GetTimeStandingDay")]
+        public static HttpResponseMessage GetTimeStandingDay([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "gettimestandingday/{UserID}/{first_date}/{last_date}")]HttpRequestMessage req, String UserID,DateTime first_date, DateTime last_date, TraceWriter log)
+        {
+            try
+            {
+                List<Track> tracks = new List<Track>();
+                using (SqlConnection connection = new SqlConnection(CONNECTIONSTRING))
+                {
+                    connection.Open();
+                    using (SqlCommand command = new SqlCommand())
+                    {
+                        command.Connection = connection;
+                        string sql = "SELECT [time],[isStanding] FROM [dbo].[tracking] WHERE [userID] = @userID and [time] between @first_date and @last_date";
+                        command.Parameters.AddWithValue("@userID", UserID);
+                        command.Parameters.AddWithValue("@first_date", first_date);
+                        command.Parameters.AddWithValue("@last_date", last_date);
+                        command.CommandText = sql;
+                        SqlDataReader reader = command.ExecuteReader();
+                        while (reader.Read())
+                        {
+                            Track track = new Track();
+                            track.Date = Convert.ToDateTime(reader["time"]);
+                            track.isStanding = Convert.ToBoolean(reader["isStanding"]);
+                            tracks.Add(track);
+                        }
+                    }
+                }
+                //var json = JsonConvert.SerializeObject(garbageTypes);
+                List<TimeStandingDay> listCalculateTimeStandingDay = CalculateTimeStandingDay(tracks);
+
+                return req.CreateResponse(HttpStatusCode.OK, listCalculateTimeStandingDay);
+            }
+            catch (Exception ex)
+            {
+                return req.CreateResponse(HttpStatusCode.InternalServerError, ex);
+
+            }
+        }
+        #endregion
+
         #region Add Bug
         [FunctionName("AddBug")]
         public static async System.Threading.Tasks.Task<HttpResponseMessage> AddBug([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "addbug")]HttpRequestMessage req, TraceWriter log)
@@ -230,7 +267,7 @@ namespace ImaniAF
         {
             try
             {
-                List<RegisterUser> followers = new List<RegisterUser>();
+                List<RegisterUser> tracks = new List<RegisterUser>();
                 using (SqlConnection connection = new SqlConnection(CONNECTIONSTRING))
                 {
                     connection.Open();
@@ -243,18 +280,18 @@ namespace ImaniAF
                         SqlDataReader reader = command.ExecuteReader();
                         while (reader.Read())
                         {
-                            RegisterUser user = new RegisterUser();
-                            user.UserId = new Guid(reader["userID"].ToString());
-                            user.Name = reader["name"].ToString();
-                            user.Email = reader["email"].ToString();
-                            user.Password = reader["password"].ToString();
-                            user.Sharekey = reader["sharekey"].ToString();
-                            followers.Add(user);
+                            RegisterUser track = new RegisterUser();
+                            track.UserId = new Guid(reader["userID"].ToString());
+                            track.Name = reader["name"].ToString();
+                            track.Email = reader["email"].ToString();
+                            track.Password = reader["password"].ToString();
+                            track.Sharekey = reader["sharekey"].ToString();
+                            tracks.Add(track);
                         }
                     }
                 }
                 //var json = JsonConvert.SerializeObject(garbageTypes);
-                return req.CreateResponse(HttpStatusCode.OK, followers);
+                return req.CreateResponse(HttpStatusCode.OK, tracks);
             }
             catch (Exception ex)
             {
@@ -267,7 +304,7 @@ namespace ImaniAF
 
         #region Delete follower
         [FunctionName("DeleteFollower")]
-        public static HttpResponseMessage DeleteFollower([HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "delete/{userid}/{delete_follower}")]HttpRequestMessage req, String userid, String delete_follower, TraceWriter log)
+        public static HttpResponseMessage DeleteFollower([HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "deletefollower/{userid}/{delete_follower}")]HttpRequestMessage req, String userid, String delete_follower, TraceWriter log)
         {
             try
             {
@@ -282,15 +319,16 @@ namespace ImaniAF
                         command.Parameters.AddWithValue("@delete_follower", delete_follower);
                         command.CommandText = sql;
                         command.ExecuteNonQuery();
+
+                        return req.CreateResponse(HttpStatusCode.OK);
                     }
                 }
                 //var json = JsonConvert.SerializeObject(garbageTypes);
-                return req.CreateResponse(HttpStatusCode.OK);
+               
             }
             catch (Exception ex)
             {
                 return req.CreateResponse(HttpStatusCode.InternalServerError, ex);
-
             }
         }
         #endregion
@@ -495,11 +533,11 @@ namespace ImaniAF
 
         #region UpdateUser
         [FunctionName("UpdateUser")]
-        public static async System.Threading.Tasks.Task<HttpResponseMessage> UpdateUser([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "updateuser")]HttpRequestMessage req, TraceWriter log)
+        public static async System.Threading.Tasks.Task<HttpResponseMessage> UpdateUser([HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "updateuser")]HttpRequestMessage req, TraceWriter log)
         {
             var content = await req.Content.ReadAsStringAsync();
             var user_update = JsonConvert.DeserializeObject<RegisterUser>(content);
-        
+
             try
             {
                 using (SqlConnection connection = new SqlConnection(CONNECTIONSTRING))
@@ -508,17 +546,15 @@ namespace ImaniAF
                     using (SqlCommand command = new SqlCommand())
                     {
                         command.Connection = connection;
-                        string sql = "UPDATE [user] SET email =  @email, name = @name, password = @password WHERE userID = @userID;";
+                        string sql = "UPDATE [user] SET name = @name, password = @password WHERE userID = @userID;";
                         command.CommandText = sql;
                         String salt = CreateSalt(8);
                         String hash = GenerateSaltedHash(user_update.Password.ToString(), salt);
                         command.Parameters.AddWithValue("@userID", user_update.UserId);
-                        command.Parameters.AddWithValue("@email", user_update.Email);
                         command.Parameters.AddWithValue("@name", user_update.Name);
                         command.Parameters.AddWithValue("@password", salt + ":" + hash);
-             
-                   
                         command.ExecuteNonQuery();
+                        user_update.Password = "";
                         return req.CreateResponse(HttpStatusCode.OK, user_update);
                     }
                 }
@@ -595,6 +631,86 @@ namespace ImaniAF
             foreach (byte b in ba)
                 hex.AppendFormat("{0:x2}", b);
             return hex.ToString();
+        }
+      
+        public static List<TimeStandingDay> CalculateTimeStandingDay(List<Track> tracks)
+        {
+            List<TimeStandingDay> list = new List<TimeStandingDay>();
+
+            for (int x = 9; x < 17; x++) //elk uur wordt overlopen, werkdag is van 9:00 tot 17:00
+            {
+                for (int i = 0; i < tracks.Count; i++) //elke track wordt overlopen 
+                {
+                    TimeStandingDay timeStandingDay = new TimeStandingDay();
+
+                    if (tracks[i].Date.Hour.ToString() == x.ToString())
+                    {
+                        timeStandingDay.Hour = x;
+                        if (tracks[i].isStanding == true) //als de track.isStanding = 1 is --> dus de persoon is gaan rechtstaan
+                        {
+                            if (i + 1 == tracks.Count || tracks[i].Date.Hour != tracks[i + 1].Date.Hour)
+                            //als de laatste track rechtstaan is dan moet men de tijd tot het einde van de berekenen
+                            {
+                                DateTime StartOfRecorded = new DateTime(tracks[0].Date.Year, tracks[0].Date.Month, tracks[0].Date.Day, x + 1, 0, 0);
+                                timeStandingDay.TimeStandingSeconds = (StartOfRecorded - tracks[i].Date).TotalSeconds;
+                                list.Add(timeStandingDay);
+                            }
+                        }
+                        else  //(tracks[i].isStanding == false) --> bij zitten, bij een 0
+                        {
+                            if (i == 0 || tracks[i - 1].Date.Hour != tracks[i].Date.Hour)
+                            {
+                                DateTime StartOfRecorded = new DateTime(tracks[0].Date.Year, tracks[0].Date.Month, tracks[0].Date.Day, x, 0, 0);
+                                timeStandingDay.TimeStandingSeconds = (tracks[i].Date - StartOfRecorded).TotalSeconds;
+                                list.Add(timeStandingDay);
+                            }
+                            else
+                            {
+                                timeStandingDay.TimeStandingSeconds = (tracks[i].Date - tracks[i - 1].Date).TotalSeconds;
+                                list.Add(timeStandingDay);
+                            }
+                        }
+                    }
+                }
+            }
+
+        List<TimeStandingDay> gefilterde_list = new List<TimeStandingDay>(); ;
+
+        for (int y = 0; y < list.Count; y++)
+        {
+            TimeStandingDay timeStandingDay = new TimeStandingDay();
+            // if (y + 1 == tracks.Count)
+            //{
+
+
+            if (list[y].Hour == list[y + 1].Hour)
+            {
+                int aantalitems = 0;
+                double totaalSeconds = 0;
+                while (list[y].Hour == list[y + aantalitems].Hour)
+                {
+
+                    totaalSeconds += list[y + aantalitems].TimeStandingSeconds;
+
+                    timeStandingDay.Hour = list[y].Hour;
+                    timeStandingDay.TimeStandingSeconds = totaalSeconds;
+
+
+                    aantalitems += 1;
+                }
+                gefilterde_list.Add(timeStandingDay);
+            }
+            else
+            {
+                timeStandingDay.Hour = list[y].Hour;
+                timeStandingDay.TimeStandingSeconds = list[y].TimeStandingSeconds;
+                gefilterde_list.Add(timeStandingDay);
+            }
+            //}   
+        }
+
+        return gefilterde_list;
+        
         }
         #endregion
     }
