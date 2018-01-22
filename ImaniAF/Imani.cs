@@ -404,7 +404,6 @@ namespace ImaniAF
                 return req.CreateResponse(HttpStatusCode.InternalServerError, ex);
             }
         }
-
         #endregion
 
         #region Login User
@@ -563,6 +562,69 @@ namespace ImaniAF
                         command.ExecuteNonQuery();
                         user_update.Password = "";
                         return req.CreateResponse(HttpStatusCode.OK, user_update);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return req.CreateResponse(HttpStatusCode.InternalServerError, ex);
+            }
+        }
+        #endregion
+
+        #region Password check
+        [FunctionName("CheckPsw")]
+        public static async Task<HttpResponseMessage> CheckPsw([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "checkpsw")]HttpRequestMessage req, TraceWriter log)
+        {
+            //Inlezen van externe json
+            var content = await req.Content.ReadAsStringAsync();
+            RegisterUser user_try = JsonConvert.DeserializeObject<RegisterUser>(content);
+            RegisterUser user_database = new RegisterUser();
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(CONNECTIONSTRING))
+                {
+                    connection.Open();
+                    using (SqlCommand command = new SqlCommand())
+                    {
+                        command.Connection = connection;
+                        string sql = "SELECT email, password FROM [user] WHERE userID = @userid";
+                        command.Parameters.AddWithValue("@userid", user_try.UserId.ToString());
+                        command.CommandText = sql;
+                        SqlDataReader reader = command.ExecuteReader();
+                        while (reader.Read())
+                        {
+                            user_database.Password = reader["password"].ToString();
+                        }
+                        if (reader.HasRows == false)
+                        {
+                            return req.CreateResponse(HttpStatusCode.OK, "NOK");
+                        }
+                        else
+                        {
+                            String[] delen = user_database.Password.ToString().Split(':');
+                            String database_salt = delen[0].ToString();
+
+                            String database_hash = delen[1].ToString();
+
+                            String hash_try = GenerateSaltedHash(user_try.Password.ToString(), database_salt);
+
+                            bool acces = CompareByteArrays(Encoding.UTF8.GetBytes(database_hash), Encoding.UTF8.GetBytes(hash_try));
+
+                            byte[] dbhash = Encoding.UTF8.GetBytes(database_hash);
+                            byte[] dbhashsalt = Encoding.UTF8.GetBytes(database_salt);
+                            Debug.WriteLine(database_hash);
+                            Debug.WriteLine(hash_try);
+                            connection.Close();
+                            if(acces == true)
+                            {
+                                return req.CreateResponse(HttpStatusCode.OK, "OK");
+                            }
+                            else
+                            {
+                                return req.CreateResponse(HttpStatusCode.OK, "NOK");
+                            }
+                        }
                     }
                 }
             }
