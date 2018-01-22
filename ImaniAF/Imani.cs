@@ -199,7 +199,7 @@ namespace ImaniAF
 
         #region Get Track
         [FunctionName("GetTimeStandingDay")]
-        public static HttpResponseMessage GetTimeStandingDay([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "gettimestandingday/{UserID}/{first_date}/{last_date}")]HttpRequestMessage req, String UserID,DateTime first_date, DateTime last_date, TraceWriter log)
+        public static HttpResponseMessage GetTimeStandingDay([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "gettimestandingday/{UserID}/{first_date}/{last_date}")]HttpRequestMessage req, String UserID,String first_date, String last_date, TraceWriter log)
         {
             try
             {
@@ -212,8 +212,8 @@ namespace ImaniAF
                         command.Connection = connection;
                         string sql = "SELECT [time],[isStanding] FROM [dbo].[tracking] WHERE [userID] = @userID and [time] between @first_date and @last_date";
                         command.Parameters.AddWithValue("@userID", UserID);
-                        command.Parameters.AddWithValue("@first_date", first_date);
-                        command.Parameters.AddWithValue("@last_date", last_date);
+                        command.Parameters.AddWithValue("@first_date", Convert.ToDateTime(first_date));
+                        command.Parameters.AddWithValue("@last_date", Convert.ToDateTime(last_date));
                         command.CommandText = sql;
                         SqlDataReader reader = command.ExecuteReader();
                         while (reader.Read())
