@@ -837,7 +837,7 @@ namespace ImaniAF
                 else
                 {
                     timeStandingDay.Hour = uur;
-                    timeStandingDay.TimeStandingSeconds = 0;
+                    timeStandingDay.TimeStandingSeconds = 1;
                     extraGefilterde_list.Add(timeStandingDay);
                     aantalNullen += 1;
                     uur += 1;
