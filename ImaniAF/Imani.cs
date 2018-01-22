@@ -20,7 +20,7 @@ namespace ImaniAF
 {
     public static class Imani
     {
-        //SQL
+        //SQL CONNECTIONSTRING
         private static string CONNECTIONSTRING = Environment.GetEnvironmentVariable("ConnectionString");
 
         #region leeg
@@ -123,8 +123,36 @@ namespace ImaniAF
                             user.UserId = new Guid(reader["userID"].ToString());
                             user.Name = reader["name"].ToString();
                             user.Email = reader["email"].ToString();
-                            user.Password = reader["password"].ToString();
                             user.Sharekey = reader["sharekey"].ToString();
+                        }
+                        if (reader.HasRows == false)
+                        {
+                            //User bestaat niet
+                            return req.CreateResponse(HttpStatusCode.OK, "User niet gevonden");
+                        }
+                        else
+                        {
+                            try
+                            {
+                                using (SqlConnection connection2 = new SqlConnection(CONNECTIONSTRING))
+                                {
+                                    connection2.Open();
+                                    using (SqlCommand command2 = new SqlCommand())
+                                    {
+                                        command2.Connection = connection2;
+                                        string sql2 = "INSERT INTO [follow_users] VALUES(@userID, @follow_userID)";
+                                        command2.CommandText = sql2;
+                                        command2.Parameters.AddWithValue("@userID", user.UserId.ToString());
+                                        command2.Parameters.AddWithValue("@follow_userID", base_userID);
+                                        command2.ExecuteNonQuery();
+                                        return req.CreateResponse(HttpStatusCode.OK, user);
+                                    }
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                return req.CreateResponse(HttpStatusCode.InternalServerError, ex);
+                            }
                         }
                     }
                 }
@@ -134,27 +162,6 @@ namespace ImaniAF
                 return req.CreateResponse(HttpStatusCode.InternalServerError, ex);
             }
             //Follower toevoegen aan de vorige user.
-            try
-            {
-                using (SqlConnection connection = new SqlConnection(CONNECTIONSTRING))
-                {
-                    connection.Open();
-                    using (SqlCommand command = new SqlCommand())
-                    {
-                        command.Connection = connection;
-                        string sql = "INSERT INTO [follow_users] VALUES(@userID, @follow_userID)";
-                        command.CommandText = sql;
-                        command.Parameters.AddWithValue("@userID", user.UserId.ToString());
-                        command.Parameters.AddWithValue("@follow_userID", base_userID);
-                        command.ExecuteNonQuery();
-                        return req.CreateResponse(HttpStatusCode.OK, user);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                 return req.CreateResponse(HttpStatusCode.InternalServerError, ex);
-            }
         }
         #endregion
 
@@ -362,7 +369,7 @@ namespace ImaniAF
         }
         #endregion
 
-        #region GetUser
+        #region Get User
         [FunctionName("GetUser")]
         public static HttpResponseMessage GetUser([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "getuser/{UserID}")]HttpRequestMessage req, String UserID, TraceWriter log)
         {
