@@ -636,6 +636,34 @@ namespace ImaniAF
         }
         #endregion
 
+        #region Update Notifications
+        [FunctionName("UpdateNotifications")]
+        public static HttpResponseMessage UpdateNotifications([HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "updatenotifications/{userid}/{wantsNotification}")]HttpRequestMessage req, string UserID, Boolean wantsnotification, TraceWriter log)
+        {
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(CONNECTIONSTRING))
+                {
+                    connection.Open();
+                    using (SqlCommand command = new SqlCommand())
+                    {
+                        command.Connection = connection;
+                        string sql = "UPDATE [user] SET wantsNotifications = @wantsNotifications WHERE userID = @userID;";
+                        command.CommandText = sql;
+                        command.Parameters.AddWithValue("@userID", UserID);
+                        command.Parameters.AddWithValue("@wantsNotifications", wantsnotification);
+                        command.ExecuteNonQuery();
+                        return req.CreateResponse(HttpStatusCode.OK);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return req.CreateResponse(HttpStatusCode.InternalServerError, ex);
+            }
+        }
+        #endregion
+
         #region Functions
         public static string GenerateSharkey()
         {
