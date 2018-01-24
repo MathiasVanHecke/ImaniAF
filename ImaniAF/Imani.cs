@@ -71,9 +71,10 @@ namespace ImaniAF
                                 connection2.Open();
                                 using (SqlCommand command2 = new SqlCommand())
                                 {
-                                    string sql2 = "INSERT INTO [user] VALUES(@userID,@created, @name, @email, @password,@sharekey)";
+                                    string sql2 = "INSERT INTO [user] VALUES(@userID,@created, @name, @email, @password,@sharekey, @wantsNotifications)";
                                     command2.CommandText = sql2;
                                     command2.Connection = connection2;
+                                    Boolean wantNotifications = true;
                                     String salt = CreateSalt(8);
                                     String hash = GenerateSaltedHash(user_try.Password.ToString(), salt);
                                     command2.Parameters.AddWithValue("@userID", user_try.UserId.ToString());
@@ -82,9 +83,8 @@ namespace ImaniAF
                                     command2.Parameters.AddWithValue("@email", user_try.Email);
                                     command2.Parameters.AddWithValue("@password", salt + ":" + hash);
                                     command2.Parameters.AddWithValue("@sharekey", GenerateSharkey());
-                             
+                                    command2.Parameters.AddWithValue("@wantsNotifications", wantNotifications);
                                     command2.ExecuteNonQuery();
-
                                     return req.CreateResponse(HttpStatusCode.OK, user_try);
                                 }
                             }
@@ -475,6 +475,7 @@ namespace ImaniAF
                                             user.Name = reader2["name"].ToString();
                                             user.Email = reader2["email"].ToString();
                                             user.Sharekey = reader2["sharekey"].ToString();
+                                            user.WantsNotifications = Convert.ToBoolean(reader2["wantsnotifications"]);
                                         }
                                     }
                                 }
@@ -702,149 +703,188 @@ namespace ImaniAF
             return hex.ToString();
         }
 
-        public static List<TimeStandingDay> CalculateTimeStandingDay(List<Track> tracks)
+       public static List<TimeStandingDay> CalculateTimeStandingDay(List<Track> tracks)
         {
-            List<TimeStandingDay> list = new List<TimeStandingDay>();
 
-            for (int x = 9; x < 17; x++) //elk uur wordt overlopen, werkdag is van 9:00 tot 17:00
+            try
             {
-                for (int i = 0; i < tracks.Count; i++) //elke track wordt overlopen 
+                List<TimeStandingDay> list = new List<TimeStandingDay>();
+                int a = 0;
+                for (int x = 9; x < 17; x++) //elk uur wordt overlopen, werkdag is van 9:00 tot 17:00
                 {
 
-                    TimeStandingDay timeStandingDay = new TimeStandingDay();
-                    if (tracks[i].Date.Hour.ToString() == x.ToString())
+                    int tussentijdseX = x;
+                    for (int i = 0; i < tracks.Count; i++) //elke track wordt overlopen 
                     {
-                        timeStandingDay.Hour = x;
-
-                        if (tracks[i].isStanding == true) //als de track.isStanding = 1 is --> dus de persoon is gaan rechtstaan
+                        if (i == 0 || tracks[i - 1].isStanding != tracks[i].isStanding)
                         {
-
-                            if (i + 1 == tracks.Count || tracks[i].Date.Hour != tracks[i + 1].Date.Hour)
-                            //als de laatste track rechtstaan is dan moet men de tijd tot het einde van de berekenen
+                            TimeStandingDay timeStandingDay = new TimeStandingDay();
+                            if (tracks[i].Date.Hour.ToString() == x.ToString())
                             {
-                                DateTime StartOfRecorded = new DateTime(tracks[0].Date.Year, tracks[0].Date.Month, tracks[0].Date.Day, x + 1, 0, 0);
-                                timeStandingDay.TimeStandingSeconds = (StartOfRecorded - tracks[i].Date).TotalSeconds;
-                                list.Add(timeStandingDay);
-                            }
-                        }
-                        else  //(tracks[i].isStanding == false) --> bij zitten, bij een 0
-                        {
+                                timeStandingDay.Hour = x;
+                                a = 0;
 
-                            if (i == 0 || tracks[i - 1].Date.Hour != tracks[i].Date.Hour)
-                            {
-
-                                DateTime StartOfRecorded = new DateTime(tracks[0].Date.Year, tracks[0].Date.Month, tracks[0].Date.Day, x, 0, 0);
-                                timeStandingDay.TimeStandingSeconds = (tracks[i].Date - StartOfRecorded).TotalSeconds;
-                                list.Add(timeStandingDay);
-
-
-                            }
-                            else
-                            {
-                                timeStandingDay.TimeStandingSeconds = (tracks[i].Date - tracks[i - 1].Date).TotalSeconds;
-                                list.Add(timeStandingDay);
-                            }
-                        }
-                    }
-                    else
-                    {
-
-                        for (int a = 2; a < 8; a++)
-                        {
-
-                            if (i >= a)
-                            {
-                                if (i != (a - 2) && tracks[i].Date.Hour - a == tracks[i - (a - 1)].Date.Hour && (tracks[i].Date.Hour - (a - 1)).ToString() == x.ToString())
+                                if (tracks[i].isStanding == true) //als de track.isStanding = 1 is --> dus de persoon is gaan rechtstaan
                                 {
-                                    // als er een uur wordt rechtgestaan wordt dit uitgevoerd
 
-                                    if (tracks[i - 1].isStanding == true)
+                                    if (i + 1 == tracks.Count || tracks[i].Date.Hour != tracks[i + 1].Date.Hour)
+                                    //als de laatste track rechtstaan is dan moet men de tijd tot het einde van de berekenen
                                     {
-                                        timeStandingDay.Hour = x;
+                                        DateTime StartOfRecorded = new DateTime(tracks[0].Date.Year, tracks[0].Date.Month, tracks[0].Date.Day, x + 1, 0, 0);
+                                        timeStandingDay.TimeStandingSeconds = (StartOfRecorded - tracks[i].Date).TotalSeconds;
+                                        list.Add(timeStandingDay);
+                                    }
+                                }
+                                else  //(tracks[i].isStanding == false) --> bij zitten, bij een 0
+                                {
 
-                                        timeStandingDay.TimeStandingSeconds = 3600;
+                                    if (i == 0 || tracks[i - 1].Date.Hour != tracks[i].Date.Hour)
+                                    {
+
+                                        DateTime StartOfRecorded = new DateTime(tracks[0].Date.Year, tracks[0].Date.Month, tracks[0].Date.Day, x, 0, 0);
+                                        timeStandingDay.TimeStandingSeconds = (tracks[i].Date - StartOfRecorded).TotalSeconds;
+                                        list.Add(timeStandingDay);
+
+                                    }
+                                    else
+                                    {
+                                        timeStandingDay.TimeStandingSeconds = (tracks[i].Date - tracks[i - 1].Date).TotalSeconds;
                                         list.Add(timeStandingDay);
                                     }
                                 }
                             }
-                            else if (i == 0 && tracks[i].isStanding == false && (tracks[i].Date.Hour - (a - 1)).ToString() == x.ToString())
+                            else if (i < tracks.Count && i != 0)
                             {
+                                //als (tracks[i].Date.Hour.ToString() != x.ToString())
 
-                                timeStandingDay.Hour = x;
-                                timeStandingDay.TimeStandingSeconds = 3600;
-                                list.Add(timeStandingDay);
+                                /* VOLLEDIG UUR STAAN
+                                    als de vorige track isStanding = true (1)
+                                & als het uur van huidige track != het uur van de vorige track
+                                & als het uur van huidige track - 1 != het uur van de vorige track
+                                & als het uur van de vorige track + 1 = x
+                                ==> dan 3600
+                                */
+                                if (tracks[i - 1].isStanding == true && tracks[i].Date.Hour != tracks[i - 1].Date.Hour && tracks[i].Date.Hour - 1 != tracks[i - 1].Date.Hour && tracks[i - 1].Date.Hour + 1 + a == x)
+                                {
+                                    timeStandingDay.Hour = x;
 
+                                    timeStandingDay.TimeStandingSeconds = 3600;
+                                    list.Add(timeStandingDay);
+                                    a += 1;
+
+                                }
+
+                                else if (i == tracks.Count - 1 && list.Count != 0)
+                                {
+                                    if (list[list.Count - 1].Hour != x && tracks[i].isStanding == false)
+                                    {
+                                        timeStandingDay.Hour = x;
+                                        timeStandingDay.TimeStandingSeconds = 0;
+                                        list.Add(timeStandingDay);
+                                    }
+                                    else if (list[list.Count - 1].Hour != x && tracks[i].isStanding == true)
+                                    {
+                                        timeStandingDay.Hour = x;
+                                        timeStandingDay.TimeStandingSeconds = 3600;
+                                        list.Add(timeStandingDay);
+                                    }
+
+                                }
+                                else if (i == 1)
+                                {
+                                    if (tracks[i].Date.Hour > x)
+                                    {
+                                        if (tracks[i - 1].isStanding == false)
+                                        {
+                                            timeStandingDay.Hour = x;
+                                            timeStandingDay.TimeStandingSeconds = 3600;
+                                            list.Add(timeStandingDay);
+                                        }
+                                        else if (tracks[i - 1].isStanding == true)
+                                        {
+                                            timeStandingDay.Hour = x;
+                                            timeStandingDay.TimeStandingSeconds = 0;
+                                            list.Add(timeStandingDay);
+                                        }
+                                    }
+                                }
                             }
-
                         }
 
 
                     }
                 }
-            }
-            List<TimeStandingDay> gefilterde_list = new List<TimeStandingDay>(); ;
+                List<TimeStandingDay> gefilterde_list = new List<TimeStandingDay>(); ;
 
-            // elk item van de lijst moet overlopen worden dus kijken we hoevaak we dit moeten doen
-            int listlengte = list.Count;
-            for (int y = 0; y < listlengte; y++)
-            {
-                TimeStandingDay timeStandingDay = new TimeStandingDay();
-                if (y < listlengte)
+                // elk item van de lijst moet overlopen worden dus kijken we hoevaak we dit moeten doen
+                int listlengte = list.Count;
+                for (int y = 0; y < listlengte; y++)
                 {
-
-                    if (y == listlengte - 1)
+                    TimeStandingDay timeStandingDay = new TimeStandingDay();
+                    if (y < listlengte)
                     {
-                        timeStandingDay.Hour = list[y].Hour;
-                        timeStandingDay.TimeStandingSeconds = list[y].TimeStandingSeconds;
-                        gefilterde_list.Add(timeStandingDay);
-                    }
-                    else if (list[y].Hour == list[y + 1].Hour)
-                    {
-                        int aantalitems = 0;
 
-                        while (y + aantalitems < listlengte && list[y].Hour == list[y + aantalitems].Hour)
+                        if (y == listlengte - 1)
                         {
-                            timeStandingDay.TimeStandingSeconds += list[y + aantalitems].TimeStandingSeconds;
-
                             timeStandingDay.Hour = list[y].Hour;
-
-                            aantalitems += 1;
+                            timeStandingDay.TimeStandingSeconds = list[y].TimeStandingSeconds;
+                            gefilterde_list.Add(timeStandingDay);
                         }
-                        gefilterde_list.Add(timeStandingDay);
-                        y += aantalitems - 1;
+                        else if (list[y].Hour == list[y + 1].Hour)
+                        {
+                            int aantalitems = 0;
+
+                            while (y + aantalitems < listlengte && list[y].Hour == list[y + aantalitems].Hour)
+                            {
+                                timeStandingDay.TimeStandingSeconds += list[y + aantalitems].TimeStandingSeconds;
+
+                                timeStandingDay.Hour = list[y].Hour;
+
+                                aantalitems += 1;
+                            }
+                            gefilterde_list.Add(timeStandingDay);
+                            y += aantalitems - 1;
+                        }
+                        else
+                        {
+                            timeStandingDay.Hour = list[y].Hour;
+                            timeStandingDay.TimeStandingSeconds = list[y].TimeStandingSeconds;
+                            gefilterde_list.Add(timeStandingDay);
+                        }
+                    }
+                }
+
+                List<TimeStandingDay> extraGefilterde_list = new List<TimeStandingDay>(); ;
+                int aantalNullen = 0;
+                int uur = 9;
+                while (uur < 17)
+                {
+                    TimeStandingDay timeStandingDay = new TimeStandingDay();
+
+                    if (gefilterde_list[uur - 9 - aantalNullen].Hour == uur)
+                    {
+                        extraGefilterde_list.Add(gefilterde_list[uur - 9 - aantalNullen]);
+                        uur += 1;
                     }
                     else
                     {
-                        timeStandingDay.Hour = list[y].Hour;
-                        timeStandingDay.TimeStandingSeconds = list[y].TimeStandingSeconds;
-                        gefilterde_list.Add(timeStandingDay);
+                        timeStandingDay.Hour = uur;
+                        timeStandingDay.TimeStandingSeconds = 0;
+                        extraGefilterde_list.Add(timeStandingDay);
+                        aantalNullen += 1;
+                        uur += 1;
+
                     }
                 }
+                return extraGefilterde_list;
             }
-
-            List<TimeStandingDay> extraGefilterde_list = new List<TimeStandingDay>(); ;
-            int aantalNullen = 0;
-            int uur = 9;
-            while (uur < 17)
+            catch (Exception)
             {
-                TimeStandingDay timeStandingDay = new TimeStandingDay();
 
-                if (gefilterde_list[uur - 9 - aantalNullen].Hour == uur)
-                {
-                    extraGefilterde_list.Add(gefilterde_list[uur - 9 - aantalNullen]);
-                    uur += 1;
-                }
-                else
-                {
-                    timeStandingDay.Hour = uur;
-                    timeStandingDay.TimeStandingSeconds = 1;
-                    extraGefilterde_list.Add(timeStandingDay);
-                    aantalNullen += 1;
-                    uur += 1;
-
-                }
+                return new List<TimeStandingDay>();
             }
-            return extraGefilterde_list;
+            
+            
         }
         #endregion
     }

@@ -21,5 +21,7 @@ namespace ImaniAF.Model
         public String Password { get; set; }
         [JsonProperty("sharekey")]
         public String Sharekey { get; set; }
+        [JsonProperty("wantsnotifications")]
+        public Boolean WantsNotifications { get; set; }
     }
 }
