@@ -226,7 +226,7 @@ namespace ImaniAF
                     }
                 }
                 //var json = JsonConvert.SerializeObject(garbageTypes);
-                List<TimeStandingDay> listCalculateTimeStandingDay = CalculateTimeStandingDay(tracks);
+                List<TimeStandingDay> listCalculateTimeStandingDay = CalculateTimeStandingDay(tracks, Convert.ToInt32(Convert.ToDateTime(last_date).Hour));
 
                 return req.CreateResponse(HttpStatusCode.OK, listCalculateTimeStandingDay);
             }
@@ -342,9 +342,8 @@ namespace ImaniAF
 
         #region Delete user
         [FunctionName("DeleteUser")]
-        public static HttpResponseMessage DeleteUser([HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "delete/{userid}")]HttpRequestMessage req, String userid, TraceWriter log)
+        public static HttpResponseMessage DeleteUser([HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "deleteeuser/{userid}")]HttpRequestMessage req, String userid, TraceWriter log)
         {
-            //Nog niet af tracking history moet men ook kunnen verwijderen
             try
             {
                 using (SqlConnection connection = new SqlConnection(CONNECTIONSTRING))
@@ -353,13 +352,15 @@ namespace ImaniAF
                     using (SqlCommand command = new SqlCommand())
                     {
                         command.Connection = connection;
-                        string sql = "DELETE FROM [dbo].[follow_users] WHERE [dbo].[follow_users].follow_userID = @userID DELETE FROM[dbo].[user] WHERE[dbo].[user].userID = @userID";
+                        string sql = "DELETE FROM [dbo].[follow_users] WHERE [dbo].[follow_users].follow_userID = @userID or [dbo].[follow_users].userID = @userID " +
+                                     "DELETE FROM[dbo].[tracking] WHERE[dbo].[tracking].userID = @userID " +
+                                     "DELETE FROM[dbo].[user] WHERE[dbo].[user].userID = @userID";
+
                         command.Parameters.AddWithValue("@userID", userid);
                         command.CommandText = sql;
                         command.ExecuteNonQuery();
                     }
                 }
-                //var json = JsonConvert.SerializeObject(garbageTypes);
                 return req.CreateResponse(HttpStatusCode.OK);
             }
             catch (Exception ex)
@@ -731,14 +732,14 @@ namespace ImaniAF
             return hex.ToString();
         }
 
-       public static List<TimeStandingDay> CalculateTimeStandingDay(List<Track> tracks)
+       public static List<TimeStandingDay> CalculateTimeStandingDay(List<Track> tracks, int timeUur)
         {
 
             try
             {
                 List<TimeStandingDay> list = new List<TimeStandingDay>();
                 int a = 0;
-                for (int x = 9; x < 17; x++) //elk uur wordt overlopen, werkdag is van 9:00 tot 17:00
+                for (int x = 9; x < timeUur ; x++) //elk uur wordt overlopen, werkdag is van 9:00 tot 17:00
                 {
 
                     int tussentijdseX = x;
@@ -885,7 +886,7 @@ namespace ImaniAF
                 List<TimeStandingDay> extraGefilterde_list = new List<TimeStandingDay>(); ;
                 int aantalNullen = 0;
                 int uur = 9;
-                while (uur < 17)
+                while (uur < timeUur)
                 {
                     TimeStandingDay timeStandingDay = new TimeStandingDay();
 
