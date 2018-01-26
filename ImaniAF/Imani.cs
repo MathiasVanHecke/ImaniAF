@@ -54,6 +54,7 @@ namespace ImaniAF
                         command.Parameters.AddWithValue("@email", user_try.Email.ToString());
                         command.CommandText = sql;
                         SqlDataReader reader = command.ExecuteReader();
+                        //Kijken of de gebruiker al bestaat, anders toegang geven om toe te voegen
                         while (reader.Read())
                         {
                             user_try.Email = reader["email"].ToString();
@@ -74,9 +75,12 @@ namespace ImaniAF
                                     string sql2 = "INSERT INTO [user] VALUES(@userID,@created, @name, @email, @password,@sharekey, @wantsNotifications)";
                                     command2.CommandText = sql2;
                                     command2.Connection = connection2;
+                                    //Gebruiker standaard notificaties geven
                                     Boolean wantNotifications = true;
+                                    //Gebruiker zijn password hashen
                                     String salt = CreateSalt(8);
                                     String hash = GenerateSaltedHash(user_try.Password.ToString(), salt);
+                                    //Parameters toevoegen aan sql, en sql commando uitvoeren
                                     command2.Parameters.AddWithValue("@userID", user_try.UserId.ToString());
                                     command2.Parameters.AddWithValue("@created", DateTime.Now);
                                     command2.Parameters.AddWithValue("@name", user_try.Name);
@@ -889,21 +893,28 @@ namespace ImaniAF
                 while (uur < timeUur)
                 {
                     TimeStandingDay timeStandingDay = new TimeStandingDay();
-
-                    if (gefilterde_list[uur - 9 - aantalNullen].Hour == uur)
+                    if (uur - 9 -aantalNullen < gefilterde_list.Count)
                     {
-                        extraGefilterde_list.Add(gefilterde_list[uur - 9 - aantalNullen]);
-                        uur += 1;
+                        if (gefilterde_list[uur - 9 - aantalNullen].Hour == uur)
+                        {
+                            extraGefilterde_list.Add(gefilterde_list[uur - 9 - aantalNullen]);
+                            uur += 1;
+                        }
+                        else
+                        {
+                            timeStandingDay.Hour = uur;
+                            timeStandingDay.TimeStandingSeconds = 0;
+                            extraGefilterde_list.Add(timeStandingDay);
+                            aantalNullen += 1;
+                            uur += 1;
+
+                        }
                     }
                     else
                     {
-                        timeStandingDay.Hour = uur;
-                        timeStandingDay.TimeStandingSeconds = 0;
-                        extraGefilterde_list.Add(timeStandingDay);
-                        aantalNullen += 1;
                         uur += 1;
-
                     }
+                    
                 }
                 return extraGefilterde_list;
             }
