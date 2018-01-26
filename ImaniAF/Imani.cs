@@ -110,8 +110,7 @@ namespace ImaniAF
             RegisterUser user = new RegisterUser();
             try
             {
-                //Zoek de gebruiker waar de sharekey over een komt
-
+                //Zoek de gebruiker waar de sharekey overeen komt
                 using (SqlConnection connection = new SqlConnection(CONNECTIONSTRING))
                 {
                     connection.Open();
@@ -131,7 +130,7 @@ namespace ImaniAF
                         }
                         if (reader.HasRows == false)
                         {
-                            //User bestaat niet
+                            //Sharekey linkt niet met een user.
                             return req.CreateResponse(HttpStatusCode.OK, "User niet gevonden");
                         }
                         else
@@ -143,6 +142,7 @@ namespace ImaniAF
                                     connection2.Open();
                                     using (SqlCommand command2 = new SqlCommand())
                                     {
+                                        //Link leggen tussen volger
                                         command2.Connection = connection2;
                                         string sql2 = "INSERT INTO [follow_users] VALUES(@userID, @follow_userID)";
                                         command2.CommandText = sql2;
@@ -165,7 +165,6 @@ namespace ImaniAF
             {
                 return req.CreateResponse(HttpStatusCode.InternalServerError, ex);
             }
-            //Follower toevoegen aan de vorige user.
         }
         #endregion
 
@@ -213,6 +212,7 @@ namespace ImaniAF
                     connection.Open();
                     using (SqlCommand command = new SqlCommand())
                     {
+                        //Selecteer alle tracks waar het userID mee overeen komt
                         command.Connection = connection;
                         string sql = "SELECT [time],[isStanding] FROM [dbo].[tracking] WHERE [userID] = @userID and [time] between @first_date and @last_date";
                         command.Parameters.AddWithValue("@userID", UserID);
@@ -229,7 +229,7 @@ namespace ImaniAF
                         }
                     }
                 }
-                //var json = JsonConvert.SerializeObject(garbageTypes);
+                //Calculeer een lijst per uur van time standing in seconden
                 List<TimeStandingDay> listCalculateTimeStandingDay = CalculateTimeStandingDay(tracks, Convert.ToInt32(Convert.ToDateTime(last_date).Hour));
 
                 return req.CreateResponse(HttpStatusCode.OK, listCalculateTimeStandingDay);
@@ -278,7 +278,7 @@ namespace ImaniAF
         {
             try
             {
-                List<RegisterUser> tracks = new List<RegisterUser>();
+                List<RegisterUser> followers = new List<RegisterUser>();
                 using (SqlConnection connection = new SqlConnection(CONNECTIONSTRING))
                 {
                     connection.Open();
@@ -291,18 +291,17 @@ namespace ImaniAF
                         SqlDataReader reader = command.ExecuteReader();
                         while (reader.Read())
                         {
-                            RegisterUser track = new RegisterUser();
-                            track.UserId = new Guid(reader["userID"].ToString());
-                            track.Name = reader["name"].ToString();
-                            track.Email = reader["email"].ToString();
-                            track.Password = reader["password"].ToString();
-                            track.Sharekey = reader["sharekey"].ToString();
-                            tracks.Add(track);
+                            RegisterUser follower = new RegisterUser();
+                            follower.UserId = new Guid(reader["userID"].ToString());
+                            follower.Name = reader["name"].ToString();
+                            follower.Email = reader["email"].ToString();
+                            //track.Password = reader["password"].ToString();
+                            follower.Sharekey = reader["sharekey"].ToString();
+                            followers.Add(follower);
                         }
                     }
                 }
-                //var json = JsonConvert.SerializeObject(garbageTypes);
-                return req.CreateResponse(HttpStatusCode.OK, tracks);
+                return req.CreateResponse(HttpStatusCode.OK, followers);
             }
             catch (Exception ex)
             {
@@ -355,6 +354,7 @@ namespace ImaniAF
                     connection.Open();
                     using (SqlCommand command = new SqlCommand())
                     {
+                        //Delete alles waar de user id in voor komt
                         command.Connection = connection;
                         string sql = "DELETE FROM [dbo].[follow_users] WHERE [dbo].[follow_users].follow_userID = @userID or [dbo].[follow_users].userID = @userID " +
                                      "DELETE FROM[dbo].[tracking] WHERE[dbo].[tracking].userID = @userID " +
@@ -396,7 +396,7 @@ namespace ImaniAF
                             user.UserId = new Guid(reader["userID"].ToString());
                             user.Name = reader["name"].ToString();
                             user.Email = reader["email"].ToString();
-                            user.Password = reader["password"].ToString();
+                            //user.Password = reader["password"].ToString();
                             user.Sharekey = reader["sharekey"].ToString();
                         }
                     }
@@ -736,14 +736,14 @@ namespace ImaniAF
             return hex.ToString();
         }
 
-       public static List<TimeStandingDay> CalculateTimeStandingDay(List<Track> tracks, int timeUur)
+        public static List<TimeStandingDay> CalculateTimeStandingDay(List<Track> tracks, int timeUUR)
         {
-
             try
             {
                 List<TimeStandingDay> list = new List<TimeStandingDay>();
+
                 int a = 0;
-                for (int x = 9; x < timeUur ; x++) //elk uur wordt overlopen, werkdag is van 9:00 tot 17:00
+                for (int x = 9; x < timeUUR; x++) //elk uur wordt overlopen, werkdag is van 9:00 tot 17:00
                 {
 
                     int tussentijdseX = x;
@@ -788,7 +788,7 @@ namespace ImaniAF
                             }
                             else if (i < tracks.Count && i != 0)
                             {
-                                //als (tracks[i].Date.Hour.ToString() != x.ToString())
+                                //--> als (tracks[i].Date.Hour.ToString() != x.ToString())
 
                                 /* VOLLEDIG UUR STAAN
                                     als de vorige track isStanding = true (1)
@@ -890,10 +890,10 @@ namespace ImaniAF
                 List<TimeStandingDay> extraGefilterde_list = new List<TimeStandingDay>(); ;
                 int aantalNullen = 0;
                 int uur = 9;
-                while (uur < timeUur)
+                while (uur < timeUUR)
                 {
                     TimeStandingDay timeStandingDay = new TimeStandingDay();
-                    if (uur - 9 -aantalNullen < gefilterde_list.Count)
+                    if (uur - 9 - aantalNullen < gefilterde_list.Count)
                     {
                         if (gefilterde_list[uur - 9 - aantalNullen].Hour == uur)
                         {
@@ -914,17 +914,13 @@ namespace ImaniAF
                     {
                         uur += 1;
                     }
-                    
                 }
                 return extraGefilterde_list;
             }
             catch (Exception)
             {
-
                 return new List<TimeStandingDay>();
             }
-            
-            
         }
         #endregion
     }
