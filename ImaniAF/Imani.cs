@@ -191,7 +191,7 @@ namespace ImaniAF
                     command.Parameters.AddWithValue("@time", track.Date);
                     command.Parameters.AddWithValue("@isStanding", track.isStanding);
                     command.Parameters.AddWithValue("@macDevice", track.MacDevice);
-                    
+
                     command.ExecuteNonQuery();
 
                     return req.CreateResponse(HttpStatusCode.OK, track);
@@ -202,7 +202,7 @@ namespace ImaniAF
 
         #region Get Track
         [FunctionName("GetTimeStandingDay")]
-        public static HttpResponseMessage GetTimeStandingDay([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "gettimestandingday/{UserID}/{first_date}/{last_date}")]HttpRequestMessage req, String UserID,String first_date, String last_date, TraceWriter log)
+        public static HttpResponseMessage GetTimeStandingDay([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "gettimestandingday/{UserID}/{first_date}/{last_date}")]HttpRequestMessage req, String UserID, String first_date, String last_date, TraceWriter log)
         {
             try
             {
@@ -262,7 +262,7 @@ namespace ImaniAF
                     command.CommandText = sql;
                     command.Parameters.AddWithValue("@userID", bug.UserId);
                     command.Parameters.AddWithValue("@time", bug.Date);
-                    command.Parameters.AddWithValue("@bugText",bug.BugText);
+                    command.Parameters.AddWithValue("@bugText", bug.BugText);
 
                     command.ExecuteNonQuery();
 
@@ -334,7 +334,7 @@ namespace ImaniAF
                     }
                 }
                 //var json = JsonConvert.SerializeObject(garbageTypes);
-               
+
             }
             catch (Exception ex)
             {
@@ -413,7 +413,7 @@ namespace ImaniAF
 
         #region Login User
         [FunctionName("LoginUser")]
-        public static async Task<HttpResponseMessage> LoginUserAsync([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "loginuser")]HttpRequestMessage req,TraceWriter log)
+        public static async Task<HttpResponseMessage> LoginUserAsync([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "loginuser")]HttpRequestMessage req, TraceWriter log)
         {
             //Inlezen van externe json
             var content = await req.Content.ReadAsStringAsync();
@@ -422,7 +422,7 @@ namespace ImaniAF
             try
             {
 
-             
+
                 using (SqlConnection connection = new SqlConnection(CONNECTIONSTRING))
                 {
                     connection.Open();
@@ -437,7 +437,7 @@ namespace ImaniAF
                         {
                             user_database.Password = reader["password"].ToString();
                         }
-                        if(reader.HasRows == false)
+                        if (reader.HasRows == false)
                         {
                             Debug.WriteLine("Acces denied");
                             return req.CreateResponse(HttpStatusCode.OK, user_database);
@@ -445,7 +445,7 @@ namespace ImaniAF
 
                         String[] delen = user_database.Password.ToString().Split(':');
                         String database_salt = delen[0].ToString();
-                    
+
                         String database_hash = delen[1].ToString();
 
                         String hash_try = GenerateSaltedHash(user_try.Password.ToString(), database_salt);
@@ -622,7 +622,7 @@ namespace ImaniAF
                             Debug.WriteLine(database_hash);
                             Debug.WriteLine(hash_try);
                             connection.Close();
-                            if(acces == true)
+                            if (acces == true)
                             {
                                 return req.CreateResponse(HttpStatusCode.OK, "OK");
                             }
@@ -707,7 +707,7 @@ namespace ImaniAF
             byte[] hash = sha256hashstring.ComputeHash(bytes);
 
             return ByteArrayToHexString(hash);
-            
+
         }
 
         public static bool CompareByteArrays(byte[] array1, byte[] array2)
@@ -741,45 +741,52 @@ namespace ImaniAF
             try
             {
                 List<TimeStandingDay> list = new List<TimeStandingDay>();
-
                 int a = 0;
                 for (int x = 9; x < timeUUR; x++) //elk uur wordt overlopen, werkdag is van 9:00 tot 17:00
                 {
 
+
                     int tussentijdseX = x;
                     for (int i = 0; i < tracks.Count; i++) //elke track wordt overlopen 
                     {
-                        if (i == 0 || tracks[i - 1].isStanding != tracks[i].isStanding)
+                        if (i == 0 || tracks[i - 1].isStanding != tracks[i].isStanding) //als het de eerste track is OF de huidige situatie is verschillend van de vorige.
                         {
                             TimeStandingDay timeStandingDay = new TimeStandingDay();
-                            if (tracks[i].Date.Hour.ToString() == x.ToString())
+                            if (tracks[i].Date.Hour.ToString() == x.ToString()) // als het uur van de record die wordt overlopen gelijk is aan (het uur van de loop) x
                             {
                                 timeStandingDay.Hour = x;
                                 a = 0;
 
                                 if (tracks[i].isStanding == true) //als de track.isStanding = 1 is --> dus de persoon is gaan rechtstaan
                                 {
-
-                                    if (i + 1 == tracks.Count || tracks[i].Date.Hour != tracks[i + 1].Date.Hour)
                                     //als de laatste track rechtstaan is dan moet men de tijd tot het einde van de berekenen
+                                    // dus als het de laatste track is OF het uur van de volende record is verschillend van het uur van de volgende record
+                                    if (i + 1 == tracks.Count || tracks[i].Date.Hour != tracks[i + 1].Date.Hour)
                                     {
                                         DateTime StartOfRecorded = new DateTime(tracks[0].Date.Year, tracks[0].Date.Month, tracks[0].Date.Day, x + 1, 0, 0);
                                         timeStandingDay.TimeStandingSeconds = (StartOfRecorded - tracks[i].Date).TotalSeconds;
                                         list.Add(timeStandingDay);
                                     }
+                                    else if (tracks[i + 1].Date.Hour == tracks[i].Date.Hour) //wanneer er 2 maal 1 op het einde voorkomt 
+                                    {
+                                        if (tracks.Count == i + 2)
+                                        {
+                                            DateTime StartOfRecorded = new DateTime(tracks[0].Date.Year, tracks[0].Date.Month, tracks[0].Date.Day, x + 1, 0, 0);
+                                            timeStandingDay.TimeStandingSeconds = (StartOfRecorded - tracks[i].Date).TotalSeconds;
+                                            list.Add(timeStandingDay);
+                                        }
+                                    }
                                 }
                                 else  //(tracks[i].isStanding == false) --> bij zitten, bij een 0
                                 {
-
+                                    //als het de eerste record is OF als het uur van de vorige record verschillend is van het uur van de huidige record
                                     if (i == 0 || tracks[i - 1].Date.Hour != tracks[i].Date.Hour)
                                     {
-
                                         DateTime StartOfRecorded = new DateTime(tracks[0].Date.Year, tracks[0].Date.Month, tracks[0].Date.Day, x, 0, 0);
                                         timeStandingDay.TimeStandingSeconds = (tracks[i].Date - StartOfRecorded).TotalSeconds;
                                         list.Add(timeStandingDay);
-
                                     }
-                                    else
+                                    else //als het uur van de vorige record gelijk is aan het uur van de vorige record EN de status van de huidige record zitten is, 0 is (dus men is op dat moment gaan zitten)
                                     {
                                         timeStandingDay.TimeStandingSeconds = (tracks[i].Date - tracks[i - 1].Date).TotalSeconds;
                                         list.Add(timeStandingDay);
@@ -823,7 +830,7 @@ namespace ImaniAF
                                     }
 
                                 }
-                                else if (i == 1)
+                                else if (i == 1)//als het de tweede track is
                                 {
                                     if (tracks[i].Date.Hour > x)
                                     {
@@ -843,8 +850,28 @@ namespace ImaniAF
                                 }
                             }
                         }
+                        // dit gedeelte moet worden uitgevoerd wanneer er de laatste value 2 (of meer) keer 0 is
+                        if (i == tracks.Count - 1 && list.Count != 0)
+                        {
+                            TimeStandingDay timeStandingDay = new TimeStandingDay();
+                            if (list[list.Count - 1].Hour != x)
+                            {
+                                if (tracks[i].isStanding == false)
+                                {
+                                    timeStandingDay.Hour = x;
+                                    timeStandingDay.TimeStandingSeconds = 0;
+                                    list.Add(timeStandingDay);
+                                }
+                                else if (tracks[i].isStanding == true)
+                                {
+                                    timeStandingDay.Hour = x;
+                                    timeStandingDay.TimeStandingSeconds = 3600;
+                                    list.Add(timeStandingDay);
+                                }
+                            }
 
 
+                        }
                     }
                 }
                 List<TimeStandingDay> gefilterde_list = new List<TimeStandingDay>(); ;
@@ -857,13 +884,13 @@ namespace ImaniAF
                     if (y < listlengte)
                     {
 
-                        if (y == listlengte - 1)
+                        if (y == listlengte - 1) // het laatste item
                         {
                             timeStandingDay.Hour = list[y].Hour;
                             timeStandingDay.TimeStandingSeconds = list[y].TimeStandingSeconds;
                             gefilterde_list.Add(timeStandingDay);
                         }
-                        else if (list[y].Hour == list[y + 1].Hour)
+                        else if (list[y].Hour == list[y + 1].Hour) // als er meerdere tracks zijn van hetzelfde uur 
                         {
                             int aantalitems = 0;
 
@@ -878,7 +905,7 @@ namespace ImaniAF
                             gefilterde_list.Add(timeStandingDay);
                             y += aantalitems - 1;
                         }
-                        else
+                        else // als er slechts 1 waarde is van een bepaald uur
                         {
                             timeStandingDay.Hour = list[y].Hour;
                             timeStandingDay.TimeStandingSeconds = list[y].TimeStandingSeconds;
@@ -895,12 +922,12 @@ namespace ImaniAF
                     TimeStandingDay timeStandingDay = new TimeStandingDay();
                     if (uur - 9 - aantalNullen < gefilterde_list.Count)
                     {
-                        if (gefilterde_list[uur - 9 - aantalNullen].Hour == uur)
+                        if (gefilterde_list[uur - 9 - aantalNullen].Hour == uur) //als er een waarde bestaat voor het uur
                         {
                             extraGefilterde_list.Add(gefilterde_list[uur - 9 - aantalNullen]);
                             uur += 1;
                         }
-                        else
+                        else // hier wordt er een item toegevoegd als het 0 is
                         {
                             timeStandingDay.Hour = uur;
                             timeStandingDay.TimeStandingSeconds = 0;
@@ -922,6 +949,8 @@ namespace ImaniAF
                 return new List<TimeStandingDay>();
             }
         }
+
         #endregion
+
     }
 }
